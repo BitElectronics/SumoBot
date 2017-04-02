@@ -1,6 +1,6 @@
 /*
   Author : Simeon Simeonov
-  Name : Bolid  Arduino project
+  Name : SumoBot  Arduino project
   Ver: 1.0.0
 */
 #include <Arduino.h>
@@ -76,7 +76,7 @@ const unsigned int sensors[SENSORS_NR] = { A2, A3, A4, A5, A6, A7 }; //left-righ
 #define PWM_FREQ      50000
 
 //------------------   -------------
-#define DISTANCE        200     //
+#define DISTANCE        200     // in mm
 #define KP              5
 #define KD              20
 #define Ki              0.05
@@ -203,14 +203,15 @@ void loop() {
   int  derivate;
 
   //---- Прочитане на текущата позиция и линеаризиране на сензорите ----
+  // -------------  получените разстояния са в мм ----------------------
   read_position();
   frontL_distance = CALLIBRATE / sensor_values[LEFT_FRONT];
   frontR_distance = CALLIBRATE / sensor_values[RIGHT_FRONT];
   left_distance = CALLIBRATE / sensor_values[LEFT_SIDE];
   right_distance = CALLIBRATE / sensor_values[RIGHT_SIDE];
   /*
-   Left and right dohio sensors are analog values.
-   Lower than 100 is the white border. Higher - dohio black disk.
+   Сензорите за край на дохиото се четат аналогово.
+   Малка стойност, под 100 е бяло поле - край на дохиото.
     sensor_values[DOHIO_LEFT], sensor_values[DOHIO_RIGHT]
    */
 
