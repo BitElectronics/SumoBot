@@ -59,7 +59,9 @@
 #define SENSORS_NR  6
 const unsigned int sensors[SENSORS_NR] = { A2, A3, A4, A5, A6, A7 }; //left-right
 
-//--------------- Калибрираща константа ------------
+//------------------------ Калибрираща константа ----------------------------
+//       Служи за линеаризиране и калибриране на сензорите
+//        Използва се  преобразуването : distance = CALLIBRATE / sensor_value;
 #define CALLIBRATE  18000
 
 
