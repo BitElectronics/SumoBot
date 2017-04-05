@@ -59,22 +59,16 @@
 #define SENSORS_NR  6
 const unsigned int sensors[SENSORS_NR] = { A2, A3, A4, A5, A6, A7 }; //left-right
 
-//--------------- Калибрираща константа ------------
+//------------------------ Калибрираща константа -------------------------
+// Използва се за линеаризиране и калибриране на сенозрите
+//  преобразужането е : distance = CALLIBRATE / sensor_value; - разстоянието е в мм
 #define CALLIBRATE  18000
-
-
-//---------------- Състояние ---------
-#define FORWARD    1
-#define LEFT       2
-#define RIGHT      3
-#define BACK       4
 
 
 ///////////////////////////////////////////////////////////////////////////
 //----------------------------------- PID ---------------------------------
 ///////////////////////////////////////////////////////////////////////////
 #define PWM_FREQ      50000
-#define SENSOR_TRESHOLD 50    // Филтриране на шумове от сензорите
 
 //------------------   -------------
 #define DISTANCE      200     //200mm
@@ -96,14 +90,13 @@ signed int motorSpeed;
 signed int control_value;
 signed int speed;
 
+signed int derivate;
+signed int integral = 0;
 
 unsigned int frontL_distance;
 unsigned int frontR_distance;
 unsigned int left_distance;
 unsigned int right_distance;
-
-signed int derivate;
-signed long integral = 0;
 
 //=================  CALIBRATE ==========================
 unsigned int sensor_values[SENSORS_NR];
@@ -165,11 +158,11 @@ void setup() {
 
 
   tone(BEEP, 2400, 400);
+  delay(500);
   noTone(BEEP);
 
   analogWrite(LEFT_PWM, 0);
   analogWrite(RIGHT_PWM, 0);
-
   left_motor_speed(0);
   right_motor_speed(0);
 
