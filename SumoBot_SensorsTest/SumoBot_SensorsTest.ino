@@ -77,7 +77,7 @@ const unsigned int sensors[SENSORS_NR] = { A2, A3, A4, A5, A6, A7 }; //left-righ
 #define SENSOR_TRESHOLD 50    // Филтриране на шумове от сензорите
 
 //------------------   -------------
-#define DISTANCE      50     //200mm
+#define DISTANCE      200     //200mm
 #define KP             1
 #define KD             48
 #define Ki              0.03
@@ -90,7 +90,6 @@ const unsigned int sensors[SENSORS_NR] = { A2, A3, A4, A5, A6, A7 }; //left-righ
 int dir;
 signed int error;
 signed int lastError;
-signed int prevError;
 signed int left_pwm;
 signed int right_pwm;
 signed int motorSpeed;
@@ -103,8 +102,7 @@ unsigned int frontR_distance;
 unsigned int left_distance;
 unsigned int right_distance;
 
-signed int derror;
-signed int last_error;
+signed int derivate;
 signed long integral = 0;
 
 //=================  CALIBRATE ==========================
@@ -205,19 +203,24 @@ void setup() {
 //============================================================================
 void loop() {
   int adc_value;
-  long quadr;
-  int  derivate;
 
   //---- Прочитане на текущата позиция и пресмятане на грешката ----
   read_position();
-  frontL_distance = 18000 / sensor_values[LEFT_FRONT];
-  frontR_distance = 18000 / sensor_values[RIGHT_FRONT];
-  left_distance = 18000 / sensor_values[LEFT_SIDE];
-  right_distance = 18000 / sensor_values[RIGHT_SIDE];
+  frontL_distance = CALLIBRATE / sensor_values[LEFT_FRONT];
+  frontR_distance = CALLIBRATE / sensor_values[RIGHT_FRONT];
+  left_distance = CALLIBRATE / sensor_values[LEFT_SIDE];
+  right_distance = CALLIBRATE / sensor_values[RIGHT_SIDE];
+/*
+    Left and right dohio sensors are analog values.
+    Lower than 100 is the white border. Higher - dohio black disk.
+    sensor_values[DOHIO_LEFT], sensor_values[DOHIO_RIGHT]
+  */
   
 
-  //error = lAngle - turn;
+  //-------------------- PID --------------------------
   error = right_distance - left_distance;
+  
+  
 
   //----------------------- Print sensors ---------------------------
     sprintf(tmp_str, "  / %3d  %3d  %3d", left_distance, frontL_distance,  frontR_distance);
@@ -227,6 +230,7 @@ void loop() {
     delay(100);
     //-------------------------------------------------------------------
 
+  //-------------- Control ---------
   //left_motor_speed(left_pwm);
   //right_motor_speed(right_pwm);
 
@@ -234,7 +238,6 @@ void loop() {
   while (digitalRead(IR_PIN) == LOW);    // Спиране ако има команда от Старт модул
 
   delay(3);
-  //delayMicroseconds(300);
 
 }
 
@@ -295,33 +298,6 @@ void read_position(void) {
   //-------------- Read Left sensors ------------
   digitalWrite( OPT_ENABLE1 , HIGH);
   delayMicroseconds(320);    // Wait for lighting
-  for (sens = 0; sens < SENSORS_NR / 2; sens++) {
-    sensor_values[sens]  = analogRead(sensors[sens]) / 2 -  sensor_min[sens];
-  }
-  digitalWrite( OPT_ENABLE1, LOW);
-
-  //-------------- Read Right sensors ------------
-  digitalWrite( OPT_ENABLE2 , HIGH);
-  delayMicroseconds(320);    // Wait for lighting
-  for (sens = SENSORS_NR / 2; sens < SENSORS_NR; sens++) {
-    sensor_values[sens]  = analogRead(sensors[sens]) / 2 -  sensor_min[sens];
-  }
-  digitalWrite( OPT_ENABLE2, LOW);
-
-
-}
-//===================== Read sensors  and scale ==================
-void read_position(void) {
-  unsigned char sens;
-  unsigned int tmp_value;
-
-  for (sens = 0; sens < SENSORS_NR; sens++) {
-    sensor_min[sens]  = analogRead(sensors[sens]) / 2;
-  }
-
-  //-------------- Read Left sensors ------------
-  digitalWrite( OPT_ENABLE1 , HIGH);
-  delayMicroseconds(320);    // Wait for lighting
   for (sens = 0; sens < 2; sens++) {
     sensor_values[sens]  = analogRead(sensors[sens]) / 2 -  sensor_min[sens];
   }
@@ -336,6 +312,5 @@ void read_position(void) {
     sensor_values[sens]  = analogRead(sensors[sens]) / 2 -  sensor_min[sens];
   }
   digitalWrite( OPT_ENABLE2, LOW);
-
 
 }
