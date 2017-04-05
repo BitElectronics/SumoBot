@@ -1,6 +1,6 @@
 /*
   Author : Simeon Simeonov
-  Name : SumoBot  Arduino project
+  Name : Bolid  Arduino project
   Ver: 1.0.0
 */
 #include <Arduino.h>
@@ -22,8 +22,8 @@
 //---------  Array index -------
 #define RIGHT_SIDE  0
 #define RIGHT_FRONT 1
-#define DOHIO_RIGHT 2
-#define DOHIO_LEFT  3
+#define DOHIO_LEFT  2
+#define DOHIO_RIGHT 3
 #define LEFT_FRONT  4
 #define LEFT_SIDE   5
 
@@ -59,10 +59,7 @@
 #define SENSORS_NR  6
 const unsigned int sensors[SENSORS_NR] = { A2, A3, A4, A5, A6, A7 }; //left-right
 
-//------------------------ Калибрираща константа ----------------------------
-//       Служи за линеаризиране и калибриране на сензорите
-//        Използва се  преобразуването : distance = CALLIBRATE / sensor_value;
-//        Полученото разстояние е в мм
+//--------------- Калибрираща константа ------------
 #define CALLIBRATE  18000
 
 
@@ -77,13 +74,15 @@ const unsigned int sensors[SENSORS_NR] = { A2, A3, A4, A5, A6, A7 }; //left-righ
 //----------------------------------- PID ---------------------------------
 ///////////////////////////////////////////////////////////////////////////
 #define PWM_FREQ      50000
+#define SENSOR_TRESHOLD 50    // Филтриране на шумове от сензорите
 
 //------------------   -------------
-#define DISTANCE        200     // in mm
-#define KP              5
-#define KD              20
-#define Ki              0.05
-#define SPEED           110
+#define DISTANCE      50     //200mm
+#define KP             1
+#define KD             48
+#define Ki              0.03
+#define SPEED           160
+#define ACQUIRE_SPEED  30
 
 
 /////////////////////////////////////////////////////////////////////////
@@ -103,6 +102,10 @@ unsigned int frontL_distance;
 unsigned int frontR_distance;
 unsigned int left_distance;
 unsigned int right_distance;
+
+signed int derror;
+signed int last_error;
+signed long integral = 0;
 
 //=================  CALIBRATE ==========================
 unsigned int sensor_values[SENSORS_NR];
@@ -192,7 +195,6 @@ void setup() {
     noTone(BEEP);
   }
 
-  //while ( (digitalRead (BUTT1) == HIGH) && (digitalRead(IR_PIN) == LOW);    // Изчакване команда от Старт модул или натискане на бутон
 }
 
 
@@ -203,36 +205,34 @@ void setup() {
 //============================================================================
 void loop() {
   int adc_value;
+  long quadr;
   int  derivate;
 
-  //---- Прочитане на текущата позиция и линеаризиране на сензорите ----
-  // -------------  получените разстояния са в мм ----------------------
+  //---- Прочитане на текущата позиция и пресмятане на грешката ----
   read_position();
-  frontL_distance = CALLIBRATE / sensor_values[LEFT_FRONT];
-  frontR_distance = CALLIBRATE / sensor_values[RIGHT_FRONT];
-  left_distance = CALLIBRATE / sensor_values[LEFT_SIDE];
-  right_distance = CALLIBRATE / sensor_values[RIGHT_SIDE];
-  /*
-   Сензорите за край на дохиото се четат аналогово.
-   Малка стойност, под 100 е бяло поле - край на дохиото.
-    sensor_values[DOHIO_LEFT], sensor_values[DOHIO_RIGHT]
-   */
-
-  //------- Wall error ------------
-  error = left_distance - right_distance;
-
-
-  //----------------------- Print sensors ---------------------------
-  sprintf(tmp_str, "  / %3d  %3d  %3d", left_distance, frontL_distance,  frontR_distance);
-  Serial.print(tmp_str);
-  sprintf(tmp_str, "  %3d err= %d | %3d %3d ",right_distance, error, sensor_values[DOHIO_LEFT], sensor_values[DOHIO_RIGHT]);
-  Serial.println(tmp_str);
-  delay(100);
-  //-------------------------------------------------------------------
+  frontL_distance = 18000 / sensor_values[LEFT_FRONT];
+  frontR_distance = 18000 / sensor_values[RIGHT_FRONT];
+  left_distance = 18000 / sensor_values[LEFT_SIDE];
+  right_distance = 18000 / sensor_values[RIGHT_SIDE];
   
 
+  //error = lAngle - turn;
+  error = right_distance - left_distance;
+
+  //-------------- Debug print ----------------
+  sprintf(tmp_str, " %3d  %3d  %3d  %3d", left_distance,  frontL_distance,  frontR_distance, right_distance);
+  Serial.println(tmp_str);
+
+
+  //left_motor_speed(left_pwm);
+  //right_motor_speed(right_pwm);
+
+
   while (digitalRead(IR_PIN) == LOW);    // Спиране ако има команда от Старт модул
+
   delay(3);
+  //delayMicroseconds(300);
+
 }
 
 
@@ -292,21 +292,18 @@ void read_position(void) {
   //-------------- Read Left sensors ------------
   digitalWrite( OPT_ENABLE1 , HIGH);
   delayMicroseconds(320);    // Wait for lighting
-  for (sens = 0; sens < 2; sens++) {
+  for (sens = 0; sens < SENSORS_NR / 2; sens++) {
     sensor_values[sens]  = analogRead(sensors[sens]) / 2 -  sensor_min[sens];
   }
-   sensor_values[DOHIO_RIGHT]  = analogRead(sensors[DOHIO_RIGHT]) / 2;    // Right dohio sensor
   digitalWrite( OPT_ENABLE1, LOW);
 
   //-------------- Read Right sensors ------------
   digitalWrite( OPT_ENABLE2 , HIGH);
   delayMicroseconds(320);    // Wait for lighting
-  sensor_values[DOHIO_LEFT]  = analogRead(sensors[DOHIO_LEFT]) / 2;       // Left dohio sensor
-  for (sens = 4; sens < SENSORS_NR; sens++) {
+  for (sens = SENSORS_NR / 2; sens < SENSORS_NR; sens++) {
     sensor_values[sens]  = analogRead(sensors[sens]) / 2 -  sensor_min[sens];
   }
   digitalWrite( OPT_ENABLE2, LOW);
 
 
 }
-
