@@ -28,10 +28,10 @@
 #define LEFT_SIDE   5
 
 //----------  Motors --------
-#define LEFT_PWM    9
-#define RIGHT_PWM   10
-#define LEFT_DIR    5
-#define RIGHT_DIR   6
+#define LEFT_PWM    10
+#define RIGHT_PWM   9
+#define LEFT_DIR    6
+#define RIGHT_DIR   5
 
 
 //--------------- LEDS -----------
@@ -219,10 +219,13 @@ void loop() {
   //error = lAngle - turn;
   error = right_distance - left_distance;
 
-  //-------------- Debug print ----------------
-  sprintf(tmp_str, " %3d  %3d  %3d  %3d", left_distance,  frontL_distance,  frontR_distance, right_distance);
-  Serial.println(tmp_str);
-
+  //----------------------- Print sensors ---------------------------
+    sprintf(tmp_str, "  / %3d  %3d  %3d", left_distance, frontL_distance,  frontR_distance);
+    Serial.print(tmp_str);
+    sprintf(tmp_str, "  %3d err= %d | %3d %3d ",right_distance, error, sensor_values[DOHIO_LEFT], sensor_values[DOHIO_RIGHT]);
+    Serial.println(tmp_str);
+    delay(100);
+    //-------------------------------------------------------------------
 
   //left_motor_speed(left_pwm);
   //right_motor_speed(right_pwm);
@@ -301,6 +304,35 @@ void read_position(void) {
   digitalWrite( OPT_ENABLE2 , HIGH);
   delayMicroseconds(320);    // Wait for lighting
   for (sens = SENSORS_NR / 2; sens < SENSORS_NR; sens++) {
+    sensor_values[sens]  = analogRead(sensors[sens]) / 2 -  sensor_min[sens];
+  }
+  digitalWrite( OPT_ENABLE2, LOW);
+
+
+}
+//===================== Read sensors  and scale ==================
+void read_position(void) {
+  unsigned char sens;
+  unsigned int tmp_value;
+
+  for (sens = 0; sens < SENSORS_NR; sens++) {
+    sensor_min[sens]  = analogRead(sensors[sens]) / 2;
+  }
+
+  //-------------- Read Left sensors ------------
+  digitalWrite( OPT_ENABLE1 , HIGH);
+  delayMicroseconds(320);    // Wait for lighting
+  for (sens = 0; sens < 2; sens++) {
+    sensor_values[sens]  = analogRead(sensors[sens]) / 2 -  sensor_min[sens];
+  }
+  sensor_values[DOHIO_RIGHT]  = analogRead(sensors[DOHIO_RIGHT]) / 2;    // Right dohio sensor
+  digitalWrite( OPT_ENABLE1, LOW);
+
+  //-------------- Read Right sensors ------------
+  digitalWrite( OPT_ENABLE2 , HIGH);
+  delayMicroseconds(320);    // Wait for lighting
+  sensor_values[DOHIO_LEFT]  = analogRead(sensors[DOHIO_LEFT]) / 2;       // Left dohio sensor
+  for (sens = 4; sens < SENSORS_NR; sens++) {
     sensor_values[sens]  = analogRead(sensors[sens]) / 2 -  sensor_min[sens];
   }
   digitalWrite( OPT_ENABLE2, LOW);
