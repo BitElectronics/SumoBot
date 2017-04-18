@@ -1,11 +1,11 @@
 /*
   Author : Vyara Simeonova
-  Name : Bolid  Arduino project
+  Name : SumoBot  Arduino project
   Ver: 1.0.0
+  Uses side and front sensors to go into tunnel
 */
 #include <Arduino.h>
 #include <PWM.h>
-
 
 #include "pitches.h"
 #include <stdio.h> // for function sprintf
@@ -71,12 +71,12 @@ const unsigned int sensors[SENSORS_NR] = { A2, A3, A4, A5, A6, A7 }; //left-righ
 #define PWM_FREQ      50000
 
 //------------------   -------------
-#define DISTANCE      200     //200mm
-#define KP             1.5
-#define KD             48
+#define DISTANCE        160     //mm
+#define KP              1.5
+#define KD              48
 #define Ki              0.03
-#define SPEED           70
-#define ACQUIRE_SPEED  30
+#define SPEED           128
+
 
 
 /////////////////////////////////////////////////////////////////////////
@@ -201,43 +201,41 @@ void loop() {
   frontR_distance = CALLIBRATE / sensor_values[RIGHT_FRONT];
   left_distance = CALLIBRATE / sensor_values[LEFT_SIDE];
   right_distance = CALLIBRATE / sensor_values[RIGHT_SIDE];
-/*
-    Left and right dohio sensors are analog values.
-    Lower than 100 is the white border. Higher - dohio black disk.
-    sensor_values[DOHIO_LEFT], sensor_values[DOHIO_RIGHT]
+  /*
+      Left and right dohio sensors are analog values.
+      Lower than 100 is the white border. Higher - dohio black disk.
+      sensor_values[DOHIO_LEFT], sensor_values[DOHIO_RIGHT]
   */
-  
+
 
   //-------------------- PID --------------------------
-  error = right_distance - left_distance;
+  error = right_distance - left_distance;   // За средата на тунела
   left_pwm = SPEED + KP * error;
-   right_pwm = SPEED - KP * error;
+  right_pwm = SPEED - KP * error;
+  /* TODO - Full PID implementation  */
 
 
-/*
-  //----------------------- Print sensors ---------------------------
-    sprintf(tmp_str, "  / %3d  %3d  %3d", left_distance, frontL_distance,  frontR_distance);
-    Serial.print(tmp_str);
-    sprintf(tmp_str, "  %3d err= %d | %3d %3d ",right_distance, error, sensor_values[DOHIO_LEFT], sensor_values[DOHIO_RIGHT]);
-    Serial.println(tmp_str);
-    delay(100);
-    //-------------------------------------------------------------------
-*/
-/*
-    sprintf(tmp_str, "  %3d %3d err= %d",left_pwm, right_pwm, error);
-    Serial.println(tmp_str);
-    delay(100);
-*/
+  /*
+    //----------------------- Print sensors ---------------------------
+    // --   Use  only for Debug!!!  It is too slow. --
+      sprintf(tmp_str, "  / %3d  %3d  %3d", left_distance, frontL_distance,  frontR_distance);
+      Serial.print(tmp_str);
+      sprintf(tmp_str, "  %3d err= %d | %3d %3d ",right_distance, error, sensor_values[DOHIO_LEFT], sensor_values[DOHIO_RIGHT]);
+      Serial.println(tmp_str);
+      delay(100);
+      //-------------------------------------------------------------------
+  */
 
-  //-------------- Control ---------  
-    left_motor_speed(left_pwm);
-    right_motor_speed(right_pwm);
+  //----------------- Control ------------
+  left_motor_speed(left_pwm);
+  right_motor_speed(right_pwm);
 
-    if (frontL_distance + frontR_distance /2 <= 150){
-     left_motor_speed(-40);
-     right_motor_speed(40);
-     delay (460);
-    }
+  //--------------- Turn Back ----------
+  if (frontL_distance + frontR_distance / 2 <= DISTANCE) {    // Средната стойност от двата сензора
+    left_motor_speed(-80);
+    right_motor_speed(80);
+    delay (460);            //Избира се скорост и време за да направи завой на 180гр.
+  }
 
 
   while (digitalRead(IR_PIN) == LOW);    // Спиране ако има команда от Старт модул
