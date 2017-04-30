@@ -23,8 +23,8 @@
 //---------  Array index -------
 #define RIGHT_SIDE  0
 #define RIGHT_FRONT 1
-#define DOHIO_LEFT  2
-#define DOHIO_RIGHT 3
+#define DOHIO_RIGHT 2
+#define  DOHIO_LEFT 3
 #define LEFT_FRONT  4
 #define LEFT_SIDE   5
 
