@@ -1,7 +1,7 @@
 /*
   Author : Vyara Simeonova
   Name : SumoBot  Arduino project
-  Ver: 1.0.0
+  Ver: 1.1
   Simple sumo programm
 */
 #include <Arduino.h>
@@ -10,6 +10,9 @@
 
 #include "pitches.h"
 #include <stdio.h> // for function sprintf
+
+#include "ir_module.h"
+
 
 //--------------------- PIN definitions -----------
 /*
@@ -63,7 +66,7 @@ const unsigned int sensors[SENSORS_NR] = { A2, A3, A4, A5, A6, A7 }; //left-righ
 //------------------------ Калибрираща константа -------------------------
 // Използва се за линеаризиране и калибриране на сенозрите
 //  преобразужането е : distance = CALLIBRATE / sensor_value; - разстоянието е в мм
-#define CALLIBRATE  18000
+#define CALLIBRATE  32000
 
 
 ///////////////////////////////////////////////////////////////////////////
@@ -76,11 +79,20 @@ const unsigned int sensors[SENSORS_NR] = { A2, A3, A4, A5, A6, A7 }; //left-righ
 #define FRONT_DISTANCE     350     //мм  - Прихващане противник отпред
 #define FRONT_ATTACK       200    //мм   - Атака - врагът е близо
 
-#define SEARCH_SPEED    70
-#define ATTACK_SPEED    200
-#define TURN_SPEED      130
-#define BACK_SPEED      160
+#define SEARCH_SPEED_HIGH   220
+#define SEARCH_SPEED_LOW    80
 
+#define BATTLE_SPEED      255
+#define ATTACK_SPEED      200
+#define TURN_SPEED        200
+#define BACK_SPEED        200
+
+#define DOHIO_BORDER_LEVEL  160
+
+
+//----------------- IR START /STOP ------------
+#define IR_CMD_START    0x40
+#define IR_CMD_STOP     0x46
 
 /////////////////////////////////////////////////////////////////////////
 //------- Global Variables -----
@@ -152,16 +164,17 @@ void setup() {
   pinMode(BUTT1, INPUT_PULLUP);
   pinMode(IR_PIN, INPUT_PULLUP);
 
-
-
-  tone(BEEP, 2400, 400);
-  delay(500);
-  noTone(BEEP);
+  //--- IR module setup  ---
+  pciSetup(IR_PIN);
 
   analogWrite(LEFT_PWM, 0);
   analogWrite(RIGHT_PWM, 0);
   left_motor_speed(0);
   right_motor_speed(0);
+
+  tone(BEEP, 2400, 400);
+  delay(500);
+  noTone(BEEP);
 
   // Изчакване натискането на бутон
   while (digitalRead (BUTT1) == HIGH);
@@ -180,6 +193,20 @@ void setup() {
     noTone(BEEP);
   }
 
+  // ----- Старт от бутон или от IR дистанционно -----
+  while (digitalRead (BUTT1) == HIGH) {
+    if (ir_data_ready) {
+      ir_data_ready = 0;
+      if (ir_data.command == IR_CMD_START)
+        break;
+    }
+  }
+
+  //------------ Бърз ход до центъра на дохиото --------
+  left_motor_speed(BATTLE_SPEED );
+  right_motor_speed(BATTLE_SPEED);
+  delay(500);
+
 }
 
 
@@ -191,7 +218,7 @@ void setup() {
 void loop() {
   int adc_value;
 
-  //---- Прочитане на текущата позиция и пресмятане на грешката ----
+  //---- Прочитане на текущата позиция и пресмятане на разстоянията ----
   read_position();
   frontL_distance = CALLIBRATE / sensor_values[LEFT_FRONT];
   frontR_distance = CALLIBRATE / sensor_values[RIGHT_FRONT];
@@ -203,72 +230,64 @@ void loop() {
       sensor_values[DOHIO_LEFT], sensor_values[DOHIO_RIGHT]
   */
 
-
-  /*
-    //----------------------- Print sensors ---------------------------
-    //--- Use only for debug!!!  It's too slow. --------
-      sprintf(tmp_str, "  / %3d  %3d  %3d", left_distance, frontL_distance,  frontR_distance);
-      Serial.print(tmp_str);
-      sprintf(tmp_str, "  %3d err= %d | %3d %3d ",right_distance, error, sensor_values[DOHIO_LEFT], sensor_values[DOHIO_RIGHT]);
-      Serial.println(tmp_str);
-      delay(100);
-      //-------------------------------------------------------------------
-  */
-
-
-  //-------------- Control ---------
-  //  Край на дохиото
-  if ((sensor_values[DOHIO_LEFT] < 150) || (sensor_values[DOHIO_RIGHT])<150) {
+  //------------------------------------- Control -------------------------------
+  // -----  Край на дохиото  -----
+  if ((sensor_values[DOHIO_LEFT] < DOHIO_BORDER_LEVEL) || (sensor_values[DOHIO_RIGHT]) < DOHIO_BORDER_LEVEL) {
     //   Назад
     left_motor_speed(-BACK_SPEED);
     right_motor_speed(-BACK_SPEED);
-    delay(200);
+    delay(300);       // Растоянието и ъгъла на завъртане се контролират с времето - delay(...)
     // Завъртане
-    left_motor_speed(-TURN_SPEED);
-    right_motor_speed(TURN_SPEED);
-    delay(300);
-
+    left_motor_speed( TURN_SPEED);
+    right_motor_speed( -TURN_SPEED);
+    delay(280);
   }
 
 
   //---------------------------------
-  if (left_distance <= SIDE_DISTANCE) {   // Враг от ляво
+  if (left_distance <= SIDE_DISTANCE) {   // Враг от ляво - завъртане
     left_motor_speed(-TURN_SPEED);
     right_motor_speed(TURN_SPEED);
-    delay(120);
+    delay(100);                       // ъгълът се определя с времето
   }
-  else if (right_distance <= SIDE_DISTANCE) {  // Враг от дясно
+  else if (right_distance <= SIDE_DISTANCE) {  // Враг от дясно - завъртане
     left_motor_speed(TURN_SPEED);
-    right_motor_speed(-TURN_SPEED);
-    delay(120);
+    right_motor_speed(-TURN_SPEED);   // ъгълът се определя с времето
+    delay(100);
   }
   else if (frontL_distance <= FRONT_DISTANCE && frontR_distance > FRONT_DISTANCE) {
-    // Враг напред в ляво - лек завой наляво ( определя се с времето)
-    left_motor_speed(-TURN_SPEED);
-    right_motor_speed(TURN_SPEED);
-    delay(30);
+    // Враг напред в ляво - лек завой наляво
+    left_motor_speed(ATTACK_SPEED);
+    right_motor_speed(ATTACK_SPEED + 50);
   }
   else if (frontR_distance <= FRONT_DISTANCE && frontL_distance > FRONT_DISTANCE) {
-    // Враг напред в дясно - лек завой надясно ( определя се с времето)
-    left_motor_speed(TURN_SPEED);
-    right_motor_speed(-TURN_SPEED);
-    delay(30);
+    // Враг напред в дясно - лек завой надясно
+    left_motor_speed(ATTACK_SPEED + 50);
+    right_motor_speed(ATTACK_SPEED);
 
-  } if (frontL_distance + frontR_distance / 2 <= FRONT_ATTACK) {
+  } else if (frontR_distance < FRONT_ATTACK || frontL_distance < FRONT_ATTACK) {
     // И двата предни сензора отчитат враг на малко разстояние
     // --- АТАКААААА ---
-    left_motor_speed(ATTACK_SPEED);
-    right_motor_speed(ATTACK_SPEED);
+    left_motor_speed(BATTLE_SPEED);
+    right_motor_speed(BATTLE_SPEED);
   } else {
-    left_motor_speed(0);
-    right_motor_speed(0);
+    left_motor_speed(SEARCH_SPEED_HIGH);
+    right_motor_speed(SEARCH_SPEED_LOW);
   }
 
 
+  //----------- Проверка за  команда "СТОП" ---------
+  if (ir_data_ready) {
+    ir_data_ready = 0;
+    if (ir_data.command == IR_CMD_STOP) {
+      left_motor_speed(0);
+      right_motor_speed(0);
+      while (1);
+    }
+  }
 
 
-
-  while (digitalRead(IR_PIN) == LOW);    // Спиране ако има команда от Старт модул
+  //while (digitalRead(IR_PIN) == LOW);    // Спиране ако има команда от Старт модул
 
   delay(3);
 
@@ -347,3 +366,4 @@ void read_position(void) {
   digitalWrite( OPT_ENABLE2, LOW);
 
 }
+
